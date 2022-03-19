@@ -1,0 +1,49 @@
+#!/bin/sh
+#SBATCH --account=djacobs
+#SBATCH --job-name=voc
+#SBATCH --time=0-1:00:00
+#SBATCH --partition=dpart
+#SBATCH --qos=high
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=8G
+#SBATCH --gres=gpu:gtx1080ti:4
+#--SBATCH --mail-type=end          
+#--SBATCH --mail-type=fail         
+#--SBATCH --mail-user=psando@umd.edu
+
+
+
+# Usage:
+#   sbatch train.sh config/paper/voc2012/voc2012_pspnet50.yaml
+
+# Setup environment
+export SCRIPT_DIR="/cfarhomes/psando/Documents/Robust-Semantic-Segmentation"
+export WORK_DIR="/scratch0/slurm_${SLURM_JOBID}"
+
+# Parse experiment name from config filename
+NOW=$(date +"%Y%m%d_%H%M%S")
+EXPERIMENT_NAME=$(basename $1 .yaml)
+echo "Date stamp: ${NOW}"
+echo "Training according to the config: ${1}"
+echo "Experiment name: ${EXPERIMENT_NAME}"
+
+
+# Copy training and config files to experiment directory
+EXPERIMENT_DIR=/vulcanscratch/psando/semseg_experiments/original_repo/${EXPERIMENT_NAME}
+mkdir -p ${EXPERIMENT_DIR}
+cp scripts/train.sh tool_train/train_sat_psp.py tool_test/voc2012/test_voc_psp.py $1 ${EXPERIMENT_DIR}
+
+module add cuda/10.2.89 gcc/8.1.0
+
+# Setup environment
+source /cfarhomes/psando/.bashrc
+conda activate seg
+# cd /cfarhomes/psando/apex
+# pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+# cd $SCRIPT_DIR
+
+# Train and validate
+export PYTHONPATH=${PYTHONPATH}:${SCRIPT_DIR}
+python ${EXPERIMENT_DIR}/train_sat_psp.py --config=${EXPERIMENT_DIR}/$(basename $1) experiment_name ${EXPERIMENT_NAME}
+python ${EXPERIMENT_DIR}/test_voc_psp.py --config=${EXPERIMENT_DIR}/$(basename $1) experiment_name ${EXPERIMENT_NAME}

@@ -6,7 +6,8 @@ import torch
 from torch import nn
 from lib.sync_bn.modules import BatchNorm1d, BatchNorm2d, BatchNorm3d
 import torch.nn.init as initer
-
+import matplotlib.pyplot as plt
+import torchvision.transforms.functional as F
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -143,3 +144,60 @@ def colorize(gray, palette):
     color = Image.fromarray(gray.astype(np.uint8)).convert('P')
     color.putpalette(palette)
     return color
+
+def show(imgs):
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    fig, axs = plt.subplots(ncols=len(imgs), squeeze=False, figsize=(30,30))
+    for i, img in enumerate(imgs):
+        img = img.detach()
+        img = F.to_pil_image(img)
+        axs[0, i].imshow(np.asarray(img))
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+def show_mask(imgs, palette):
+    """Plot segmentation masks using palette colors.
+    Parameters
+    ----------
+    imgs : Tensor
+        Shape should be (N, H, W) which can be obtained from torchvision.utils.make_grid()
+    palette : np.ndarray
+        Shape (N_classes, 3) which can be obtained from 
+        np.loadtxt('data/voc2012/voc2012_colors.txt').astype('uint8')
+    """
+    fig, axs = plt.subplots(ncols=len(imgs), squeeze=False, figsize=(30,30))
+    for i, img in enumerate(imgs):
+        img = img.numpy().astype(np.uint8) 
+        img = Image.fromarray(img).convert('P')
+        img.putpalette(palette)
+        axs[0, i].imshow(img)
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
+def show_palette_reference(dataset_name):
+    """Plot palette colors and class names for reference.
+    Parameters
+    ----------
+    imgs : Tensor
+        Shape should be (N, H, W) which can be obtained from torchvision.utils.make_grid()
+    palette : np.ndarray
+        Shape (N_classes, 3) which can be obtained from 
+        np.loadtxt('data/voc2012/voc2012_colors.txt').astype('uint8')
+    """
+    # load palette and class names
+    palette = np.loadtxt(f'data/{dataset_name}/{dataset_name}_colors.txt').astype('uint8')
+    class_names = np.loadtxt(f'data/{dataset_name}/{dataset_name}_names.txt', dtype=np.str)
+    assert len(palette) == len(class_names)
+
+    num_classes = len(class_names)
+    classes = np.array(list(range(num_classes)))
+    class_imgs = np.repeat(classes, 473*473).reshape(num_classes, 473, 473)
+
+    fig, axs = plt.subplots(ncols=len(class_imgs), squeeze=False, figsize=(30,30))
+    for i, img in enumerate(class_imgs):
+        img = img.astype(np.uint8) 
+        img = Image.fromarray(img).convert('P')
+        img.putpalette(palette)
+        axs[0, i].imshow(img)
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+        axs[0, i].set_title(class_names[i])
+

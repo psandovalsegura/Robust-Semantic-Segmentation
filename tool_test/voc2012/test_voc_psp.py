@@ -128,8 +128,12 @@ def main():
     mean_origin = [0.485, 0.456, 0.406]
     std_origin = [0.229, 0.224, 0.225]
 
-    gray_folder = os.path.join(args.save_folder, 'gray')
-    color_folder = os.path.join(args.save_folder, 'color')
+    base_save_path = os.path.join(args.experiments_directory, args.experiment_name)
+    args.model_path = os.path.join(os.path.join(base_save_path, 'model'), args.model_ckpt_name)
+    args.save_path = os.path.join(base_save_path, 'result')
+    check_makedirs(args.save_path)
+    gray_folder = os.path.join(args.save_path, 'gray')
+    color_folder = os.path.join(args.save_path, 'color')
 
     test_transform = transform.Compose([transform.ToTensor()])
     test_data = dataset.SemData(split=args.split, data_root=args.data_root, data_list=args.test_list, transform=test_transform)

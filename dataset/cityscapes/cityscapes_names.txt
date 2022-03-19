@@ -4,8 +4,8 @@ building
 wall
 fence
 pole
-traffic light
-traffic sign
+traffic_light
+traffic_sign
 vegetation
 terrain
 sky
