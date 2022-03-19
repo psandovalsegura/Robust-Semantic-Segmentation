@@ -21,7 +21,7 @@ from tensorboardX import SummaryWriter
 
 from model.pspnet import PSPNet
 from util import dataset, transform, config
-from util.util import AverageMeter, poly_learning_rate, intersectionAndUnionGPU
+from util.util import AverageMeter, poly_learning_rate, intersectionAndUnionGPU, check_makedirs
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -75,6 +75,10 @@ def main():
         args.world_size = int(os.environ["WORLD_SIZE"])
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
     args.ngpus_per_node = len(args.train_gpu)
+    base_save_path = os.path.join(args.experiments_directory, args.experiment_name)
+    args.save_path = base_save_path
+    args.model_save_path = os.path.join(base_save_path, 'model')
+    check_makedirs(args.model_save_path)
     if len(args.train_gpu) == 1:
         args.sync_bn = False
         args.distributed = False
@@ -122,7 +126,7 @@ def main_worker(gpu, ngpus_per_node, argss):
         writer = SummaryWriter(args.save_path)
         logger.info("=> creating model ...")
         logger.info("Classes: {}".format(args.classes))
-        logger.info(model)
+        # logger.info(model)
     if args.distributed:
         torch.cuda.set_device(gpu)
         args.batch_size = int(args.batch_size / ngpus_per_node)
@@ -150,21 +154,21 @@ def main_worker(gpu, ngpus_per_node, argss):
                 logger.info("=> no weight found at '{}'".format(args.weight))
 
     if args.resume:
-        if os.path.isfile(args.resume):
+        ckpt_path = os.path.join(args.model_save_path, args.resume)
+        if os.path.isfile(ckpt_path):
             if main_process():
-                logger.info("=> loading checkpoint '{}'".format(args.resume))
+                logger.info("=> loading checkpoint '{}'".format(ckpt_path))
             # checkpoint = torch.load(args.resume)
-            checkpoint = torch.load(args.resume, map_location=lambda storage, loc: storage.cuda())
-            # args.start_epoch = checkpoint['epoch']
+            checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage.cuda())
+            args.start_epoch = checkpoint['epoch']
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            # scheduler.load_state_dict(checkpoint['scheduler'])
             if main_process():
-                logger.info("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
+                logger.info("=> loaded checkpoint '{}' (epoch {})".format(ckpt_path, checkpoint['epoch']))
             del checkpoint
         else:
             if main_process():
-                logger.info("=> no checkpoint found at '{}'".format(args.resume))
+                logger.info("=> no checkpoint found at '{}'".format(ckpt_path))
 
     value_scale = 255
     mean = [0.485, 0.456, 0.406]
@@ -210,14 +214,12 @@ def main_worker(gpu, ngpus_per_node, argss):
             writer.add_scalar('allAcc_train', allAcc_train, epoch_log)
 
         if (epoch_log % args.save_freq == 0) and main_process():
-            filename = args.save_path + '/train_epoch_' + str(epoch_log) + '.pth'
+            filename = args.model_save_path + '/train_epoch_' + str(epoch_log) + '.pth'
             logger.info('Saving checkpoint to: ' + filename)
             torch.save({'epoch': epoch_log, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}, filename)
-            '''
             if epoch_log / args.save_freq > 2:
-                deletename = args.save_path + '/train_epoch_' + str(epoch_log - args.save_freq * 2) + '.pth'
+                deletename = args.model_save_path + '/train_epoch_' + str(epoch_log - args.save_freq * 2) + '.pth'
                 os.remove(deletename)
-            '''
         if args.evaluate:
             loss_val, mIoU_val, mAcc_val, allAcc_val = validate(val_loader, model, criterion)
             if main_process():

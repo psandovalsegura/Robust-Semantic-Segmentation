@@ -20,6 +20,7 @@ import apex
 from tensorboardX import SummaryWriter
 
 from model.pspnet import PSPNet, DeepLabV3
+from model.mixbn import MixBatchNorm2d
 from util import dataset, transform, config
 from util.util import AverageMeter, poly_learning_rate, intersectionAndUnionGPU, check_makedirs
 
@@ -165,6 +166,7 @@ def main_worker(gpu, ngpus_per_node, argss):
             args.start_epoch = checkpoint['epoch']
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
+            # scheduler.load_state_dict(checkpoint['scheduler'])
             if main_process():
                 logger.info("=> loaded checkpoint '{}' (epoch {})".format(ckpt_path, checkpoint['epoch']))
         else:

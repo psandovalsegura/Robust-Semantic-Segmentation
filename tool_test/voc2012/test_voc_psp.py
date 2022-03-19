@@ -149,7 +149,7 @@ def main():
 
     if not args.has_prediction:
         model = PSPNet(layers=args.layers, classes=args.classes, zoom_factor=args.zoom_factor, pretrained=False)
-        logger.info(model)
+        # logger.info(model)
         model = torch.nn.DataParallel(model).cuda()
         cudnn.benchmark = True
         if os.path.isfile(args.model_path):

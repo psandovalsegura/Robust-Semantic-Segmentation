@@ -1,21 +1,20 @@
 #!/bin/sh
 #SBATCH --account=djacobs
 #SBATCH --job-name=voc
-#SBATCH --time=0-1:00:00
+#SBATCH --time=1-12:00:00
 #SBATCH --partition=dpart
 #SBATCH --qos=high
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8G
-#SBATCH --gres=gpu:gtx1080ti:4
-#--SBATCH --mail-type=end          
-#--SBATCH --mail-type=fail         
-#--SBATCH --mail-user=psando@umd.edu
-
-
+#SBATCH --gres=gpu:p6000:4
+#SBATCH --mail-type=end          
+#SBATCH --mail-type=fail         
+#SBATCH --mail-user=psando@umd.edu
+#SBATCH --output=s-%j-%x.out
 
 # Usage:
-#   sbatch train.sh config/paper/voc2012/voc2012_pspnet50.yaml
+#   sbatch train.sh config/paper/voc2012/voc2012_pspnet50.yaml train_sat_psp
 
 # Setup environment
 export SCRIPT_DIR="/cfarhomes/psando/Documents/Robust-Semantic-Segmentation"
@@ -23,7 +22,7 @@ export WORK_DIR="/scratch0/slurm_${SLURM_JOBID}"
 
 # Parse experiment name from config filename
 NOW=$(date +"%Y%m%d_%H%M%S")
-EXPERIMENT_NAME=$(basename $1 .yaml)
+EXPERIMENT_NAME=${2} #$(basename $1 .yaml)
 echo "Date stamp: ${NOW}"
 echo "Training according to the config: ${1}"
 echo "Experiment name: ${EXPERIMENT_NAME}"
@@ -32,7 +31,7 @@ echo "Experiment name: ${EXPERIMENT_NAME}"
 # Copy training and config files to experiment directory
 EXPERIMENT_DIR=/vulcanscratch/psando/semseg_experiments/original_repo/${EXPERIMENT_NAME}
 mkdir -p ${EXPERIMENT_DIR}
-cp scripts/train.sh tool_train/train_sat_psp.py tool_test/voc2012/test_voc_psp.py $1 ${EXPERIMENT_DIR}
+cp scripts/train_voc.sh tool_train/${EXPERIMENT_NAME}.py tool_test/voc2012/test_voc_psp.py $1 ${EXPERIMENT_DIR}
 
 module add cuda/10.2.89 gcc/8.1.0
 
@@ -45,5 +44,5 @@ conda activate seg
 
 # Train and validate
 export PYTHONPATH=${PYTHONPATH}:${SCRIPT_DIR}
-python ${EXPERIMENT_DIR}/train_sat_psp.py --config=${EXPERIMENT_DIR}/$(basename $1) experiment_name ${EXPERIMENT_NAME}
+python ${EXPERIMENT_DIR}/${EXPERIMENT_NAME}.py --config=${EXPERIMENT_DIR}/$(basename $1) experiment_name ${EXPERIMENT_NAME}
 python ${EXPERIMENT_DIR}/test_voc_psp.py --config=${EXPERIMENT_DIR}/$(basename $1) experiment_name ${EXPERIMENT_NAME}

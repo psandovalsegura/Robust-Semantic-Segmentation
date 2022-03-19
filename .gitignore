@@ -56,5 +56,6 @@
 # personal
 initmodel
 slurm-*.out
+s-*.out
 __pycache__/
 lib/*
