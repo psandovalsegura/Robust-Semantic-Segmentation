@@ -19,6 +19,7 @@ from lib.sync_bn.modules import BatchNorm2d
 import apex
 from tensorboardX import SummaryWriter
 
+from functools import partial
 from model.pspnet import PSPNet, DeepLabV3
 from model.mixbn import MixBatchNorm2d
 from util import dataset, transform, config
@@ -58,6 +59,13 @@ def worker_init_fn(worker_id):
 def main_process():
     return not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % args.ngpus_per_node == 0)
 
+# AdvProp functions
+def to_status(m, status):
+    if hasattr(m, 'batch_type'):
+        m.batch_type = status
+to_adv_status = partial(to_status, status='adv')
+to_mix_status = partial(to_status, status='mix')
+to_clean_status = partial(to_status, status='clean')
 
 def main():
     args = get_parser()
@@ -95,13 +103,7 @@ def main():
 def main_worker(gpu, ngpus_per_node, argss):
     global args
     args = argss
-    if args.sync_bn:
-        if args.multiprocessing_distributed:
-            BatchNorm = apex.parallel.SyncBatchNorm
-        else:
-            BatchNorm = BatchNorm2d
-    else:
-        BatchNorm = nn.BatchNorm2d
+    BatchNorm = MixBatchNorm2d
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
             args.rank = int(os.environ["RANK"])
@@ -112,6 +114,11 @@ def main_worker(gpu, ngpus_per_node, argss):
     criterion = nn.CrossEntropyLoss(ignore_index=args.ignore_label)
 
     model = PSPNet(layers=args.layers, classes=args.classes, zoom_factor=args.zoom_factor, criterion=criterion, BatchNorm=BatchNorm)
+    if args.sync_bn:
+        if args.multiprocessing_distributed:
+            model = apex.parallel.convert_syncbn_model(model)
+        else:
+            raise ValueError("sync_bn can only be used in multi-process distributed training")
     optimizer = torch.optim.SGD(
         [{'params': model.layer0.parameters()},
          {'params': model.layer1.parameters()},
@@ -322,8 +329,12 @@ def train(train_loader, model, criterion, optimizer, epoch):
         input = input.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
 
+        # compute adversarial example using aux batch norms
+        # then return to mix batch norm
+        model.apply(to_adv_status)
         target_adver = target.detach().clone()
         adver_example, output = BIM(input, target, model, criterion, optimizer)
+        model.apply(to_mix_status)
 
         batch_size = adver_example.shape[0]
         final_input = torch.cat([input[0:batch_size//2], adver_example[batch_size//2:batch_size]], dim=0)
@@ -412,6 +423,7 @@ def validate(val_loader, model, criterion):
     union_meter = AverageMeter()
     target_meter = AverageMeter()
 
+    model.apply(to_clean_status)
     model.eval()
     end = time.time()
     for i, (input, target) in enumerate(val_loader):

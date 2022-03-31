@@ -8,19 +8,21 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem-per-cpu=8G
 #SBATCH --gres=gpu:p6000:4
+#SBATCH --output=s-%j-%x.out
 #SBATCH --mail-type=end          
 #SBATCH --mail-type=fail         
 #SBATCH --mail-user=psando@umd.edu
-#SBATCH --output=s-%j-%x.out
+#--SBATCH --dependency=afterok:
 
 # Usage:
-#   sbatch train.sh config/paper/voc2012/voc2012_pspnet50.yaml train_sat_psp
+#   sbatch scripts/train.sh config/paper/voc2012/voc2012_pspnet50.yaml train_sat_psp
+#                           [                   $1                   ] [     $2    ]
 
 # Setup environment
 export SCRIPT_DIR="/cfarhomes/psando/Documents/Robust-Semantic-Segmentation"
 export WORK_DIR="/scratch0/slurm_${SLURM_JOBID}"
 
-# Parse experiment name from config filename
+# Parse experiment name from train script filename
 NOW=$(date +"%Y%m%d_%H%M%S")
 EXPERIMENT_NAME=${2} #$(basename $1 .yaml)
 echo "Date stamp: ${NOW}"
@@ -29,11 +31,11 @@ echo "Experiment name: ${EXPERIMENT_NAME}"
 
 
 # Copy training and config files to experiment directory
-EXPERIMENT_DIR=/vulcanscratch/psando/semseg_experiments/original_repo/${EXPERIMENT_NAME}
+EXPERIMENT_DIR=/vulcanscratch/psando/semseg_experiments/${EXPERIMENT_NAME}
 mkdir -p ${EXPERIMENT_DIR}
 cp scripts/train_voc.sh tool_train/${EXPERIMENT_NAME}.py tool_test/voc2012/test_voc_psp.py $1 ${EXPERIMENT_DIR}
 
-module add cuda/10.2.89 gcc/8.1.0
+module add cuda/10.2.89 gcc/7.5.0
 
 # Setup environment
 source /cfarhomes/psando/.bashrc

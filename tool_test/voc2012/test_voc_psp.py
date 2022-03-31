@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import torch.nn.parallel
 import torch.utils.data
 import torch.nn as nn
+from tqdm import tqdm
 
 from model.pspnet import PSPNet, DeepLabV3
 from util import dataset, transform, config
@@ -22,16 +23,9 @@ cv2.ocl.setUseOpenCL(False)
 def get_parser():
     parser = argparse.ArgumentParser(description='PyTorch Semantic Segmentation')
     parser.add_argument('--config', type=str, default='config/ade20k/ade20k_pspnet50.yaml', help='config file')
-    parser.add_argument('--attack', action='store_true', help='evaluate the model with attack or not')
     parser.add_argument('opts', help='see config/ade20k/ade20k_pspnet50.yaml for all options', default=None, nargs=argparse.REMAINDER)
     args = parser.parse_args()
     assert args.config is not None
-
-    global attack_flag
-    if args.attack:
-        attack_flag = True
-    else:
-        attack_flag = False
 
     cfg = config.load_cfg_from_cfg_file(args.config)
     if args.opts is not None:
@@ -97,9 +91,6 @@ def BIM(input, target, model, eps=0.03, k_number=2, alpha=0.01):
     adversarial_example.requires_grad = True
     for mm in range(k_number):
         adversarial_example = FGSM(adversarial_example, target, model, clip_min, clip_max, eps=alpha)
-        adversarial_example = adversarial_example.detach()
-        adversarial_example.requires_grad = True
-        model.zero_grad()
     return adversarial_example
 
 
@@ -159,12 +150,23 @@ def main():
             logger.info("=> loaded checkpoint '{}'".format(args.model_path))
         else:
             raise RuntimeError("=> no checkpoint found at '{}'".format(args.model_path))
-        test(test_loader, test_data.data_list, model, args.classes, mean, std, args.base_size, args.test_h, args.test_w, args.scales, gray_folder, color_folder, colors)
+        if not args.skip_clean:
+            test(test_loader, test_data.data_list, model, args.classes, mean, std, args.base_size, args.test_h, args.test_w, args.scales, gray_folder, color_folder, colors)
     if args.split != 'test':
-        cal_acc(test_data.data_list, gray_folder, args.classes, names)
+        if not args.skip_clean:
+            cal_acc(test_data.data_list, gray_folder, args.classes, names)
+
+    # Run adversarial evaluation
+    if not args.has_prediction:
+        for attack_steps in args.test_attack_steps: 
+            gray_folder = os.path.join(args.save_path, f'gray_adv_{attack_steps}')
+            color_folder = os.path.join(args.save_path, f'color_adv_{attack_steps}')
+            test(test_loader, test_data.data_list, model, args.classes, mean, std, args.base_size, args.test_h, args.test_w, args.scales, gray_folder, color_folder, colors, attack_steps=attack_steps)
+            cal_acc(test_data.data_list, gray_folder, args.classes, names)
 
 
-def net_process(model, image, target, mean, std=None):
+def net_process(model, image, target, mean, std=None, attack_steps=0):
+    attack_flag = attack_steps > 0
     input = torch.from_numpy(image.transpose((2, 0, 1))).float()
     target = torch.from_numpy(target).long()
 
@@ -188,7 +190,7 @@ def net_process(model, image, target, mean, std=None):
 
 
     if attack_flag:
-        adver_input = BIM(input, target, model, eps=0.03, k_number=2, alpha=0.01)
+        adver_input = BIM(input, target, model, eps=0.03, k_number=attack_steps, alpha=0.01)
         with torch.no_grad():
             output = model(adver_input)
     else:
@@ -209,7 +211,7 @@ def net_process(model, image, target, mean, std=None):
     return output
 
 
-def scale_process(model, image, target, classes, crop_h, crop_w, h, w, mean, std=None, stride_rate=2/3):
+def scale_process(model, image, target, classes, crop_h, crop_w, h, w, mean, std=None, stride_rate=2/3, attack_steps=0):
     ori_h, ori_w, _ = image.shape
     pad_h = max(crop_h - ori_h, 0)
     pad_w = max(crop_w - ori_w, 0)
@@ -238,20 +240,24 @@ def scale_process(model, image, target, classes, crop_h, crop_w, h, w, mean, std
 
             target_crop = target[s_h:e_h, s_w:e_w].copy()
             count_crop[s_h:e_h, s_w:e_w] += 1
-            prediction_crop[s_h:e_h, s_w:e_w, :] += net_process(model, image_crop, target_crop, mean, std)
+            prediction_crop[s_h:e_h, s_w:e_w, :] += net_process(model, image_crop, target_crop, mean, std, attack_steps=attack_steps)
     prediction_crop /= np.expand_dims(count_crop, 2)
     prediction_crop = prediction_crop[pad_h_half:pad_h_half+ori_h, pad_w_half:pad_w_half+ori_w]
     prediction = cv2.resize(prediction_crop, (w, h), interpolation=cv2.INTER_LINEAR)
     return prediction
 
 
-def test(test_loader, data_list, model, classes, mean, std, base_size, crop_h, crop_w, scales, gray_folder, color_folder, colors):
-    logger.info('>>>>>>>>>>>>>>>> Start Evaluation >>>>>>>>>>>>>>>>')
+def test(test_loader, data_list, model, classes, mean, std, base_size, crop_h, crop_w, scales, gray_folder, color_folder, colors, attack_steps=0):
+    attack_flag = attack_steps > 0
+    if attack_flag:
+        logger.info(f'>>>>>>>>>>>>>>>> Adv (steps={attack_steps}) Evaluation >>>>>>>>>>>>>>>>')
+    else:
+        logger.info('>>>>>>>>>>>>>>>> Start Evaluation >>>>>>>>>>>>>>>>')
     data_time = AverageMeter()
     batch_time = AverageMeter()
     model.eval()
     end = time.time()
-    for i, (input, target) in enumerate(test_loader):
+    for i, (input, target) in enumerate(tqdm(test_loader)):
         data_time.update(time.time() - end)
         input = np.squeeze(input.numpy(), axis=0)
         target = np.squeeze(target.numpy(), axis=0)
@@ -274,17 +280,17 @@ def test(test_loader, data_list, model, classes, mean, std, base_size, crop_h, c
             image_scale = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
             target_scale = cv2.resize(target.astype(np.uint8), (new_w, new_h), interpolation=cv2.INTER_NEAREST)
 
-            prediction += scale_process(model, image_scale, target_scale, classes, crop_h, crop_w, h, w, mean, std)
+            prediction += scale_process(model, image_scale, target_scale, classes, crop_h, crop_w, h, w, mean, std, attack_steps=attack_steps)
         prediction /= len(scales)
         prediction = np.argmax(prediction, axis=2)
         batch_time.update(time.time() - end)
         end = time.time()
-        if ((i + 1) % 10 == 0) or (i + 1 == len(test_loader)):
-            logger.info('Test: [{}/{}] '
-                        'Data {data_time.val:.3f} ({data_time.avg:.3f}) '
-                        'Batch {batch_time.val:.3f} ({batch_time.avg:.3f}).'.format(i + 1, len(test_loader),
-                                                                                    data_time=data_time,
-                                                                                    batch_time=batch_time))
+        # if ((i + 1) % 10 == 0) or (i + 1 == len(test_loader)):
+        #     logger.info('Test: [{}/{}] '
+        #                 'Data {data_time.val:.3f} ({data_time.avg:.3f}) '
+        #                 'Batch {batch_time.val:.3f} ({batch_time.avg:.3f}).'.format(i + 1, len(test_loader),
+        #                                                                             data_time=data_time,
+        #                                                                             batch_time=batch_time))
         check_makedirs(gray_folder)
         check_makedirs(color_folder)
         gray = np.uint8(prediction)

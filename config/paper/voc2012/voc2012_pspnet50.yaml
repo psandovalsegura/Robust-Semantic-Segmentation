@@ -32,7 +32,7 @@ TRAIN:
   weight_decay: 0.0001
   manual_seed: 
   print_freq: 100
-  save_freq: 5
+  save_freq: 1
   weight:  # path to initial weight (default: none)
   resume: 
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
@@ -61,3 +61,5 @@ TEST:
   model_ckpt_name: train_epoch_50.pth
   colors_path: dataset/voc2012/voc2012_colors.txt  # path of dataset colors
   names_path: dataset/voc2012/voc2012_names.txt  # path of dataset category names
+  skip_clean: False
+  test_attack_steps: [2,4,6] # list of attack steps to evaluate

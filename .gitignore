@@ -55,7 +55,9 @@
 
 # personal
 initmodel
-slurm-*.out
-s-*.out
 __pycache__/
 lib/*
+zslurm/*
+*.out
+save_advs.py
+scripts/*
