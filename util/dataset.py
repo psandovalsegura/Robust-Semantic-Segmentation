@@ -55,6 +55,15 @@ class SemData(Dataset):
         self.data_list = make_dataset(split, data_root, data_list)
         self.transform = transform
 
+        if 'cityscapes' in data_root:
+            self.should_encode_segmap = True
+            self.void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
+            self.valid_classes = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
+            self.class_map = dict(zip(self.valid_classes, range(19)))
+            self.ignore_index = 255
+        else: 
+            self.should_encode_segmap = False
+
     def __len__(self):
         return len(self.data_list)
 
@@ -64,8 +73,18 @@ class SemData(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # convert cv2 read image from BGR order to RGB order
         image = np.float32(image)
         label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)  # GRAY 1 channel ndarray with shape H * W
+        if self.should_encode_segmap:
+            label = self._encode_segmap(label)
         if image.shape[0] != label.shape[0] or image.shape[1] != label.shape[1]:
             raise (RuntimeError("Image & label shape mismatch: " + image_path + " " + label_path + "\n"))
         if self.transform is not None:
             image, label = self.transform(image, label)
         return image, label
+
+    def _encode_segmap(self, mask):
+        # Put all void classes to zero
+        for _voidc in self.void_classes:
+            mask[mask == _voidc] = self.ignore_index
+        for _validc in self.valid_classes:
+            mask[mask == _validc] = self.class_map[_validc]
+        return mask

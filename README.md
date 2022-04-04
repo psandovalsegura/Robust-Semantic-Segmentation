@@ -1,5 +1,13 @@
 # Dynamic Divide-and-Conquer Adversarial Training for Robust Semantic Segmentation
 
+### Extra guidance for installing apex
+Ensure these modules are present and that nvidia-smi shows a GPU is available:
+```
+module add cuda/10.2.89 gcc/7.5.0
+cd /cfarhomes/psando/apex
+pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+```
+
 This is a pytorch project for the paper **Dynamic Divide-and-Conquer Adversarial Training for Robust Semantic Segmentation** by Xiaogang Xu, Hengshuang Zhao and Jiaya Jia presented at **ICCV2021**.
 
 [paper link](https://jiaya.me/publication/), [arxiv](https://arxiv.org/pdf/2003.06555)
