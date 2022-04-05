@@ -15,7 +15,6 @@ import torch.optim
 import torch.utils.data
 import torch.multiprocessing as mp
 import torch.distributed as dist
-from lib.sync_bn.modules import BatchNorm2d
 import apex
 from tensorboardX import SummaryWriter
 
@@ -93,13 +92,7 @@ def main():
 def main_worker(gpu, ngpus_per_node, argss):
     global args
     args = argss
-    if args.sync_bn:
-        if args.multiprocessing_distributed:
-            BatchNorm = apex.parallel.SyncBatchNorm
-        else:
-            BatchNorm = BatchNorm2d
-    else:
-        BatchNorm = nn.BatchNorm2d
+    BatchNorm = nn.BatchNorm2d
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
             args.rank = int(os.environ["RANK"])
@@ -111,6 +104,11 @@ def main_worker(gpu, ngpus_per_node, argss):
 
 
     model = PSPNet_DDCAT(layers=args.layers, classes=args.classes, zoom_factor=args.zoom_factor, criterion=criterion, BatchNorm=BatchNorm)
+    if args.sync_bn:
+        if args.multiprocessing_distributed:
+            model = apex.parallel.convert_syncbn_model(model)
+        else:
+            raise ValueError("sync_bn can only be used in multi-process distributed training")
     optimizer = torch.optim.SGD(
         [{'params': model.layer0.parameters()},
          {'params': model.layer1.parameters()},

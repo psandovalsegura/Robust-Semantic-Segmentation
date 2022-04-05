@@ -1,6 +1,6 @@
 #!/bin/sh
 #SBATCH --account=djacobs
-#SBATCH --job-name=city-standard
+#SBATCH --job-name=city-x
 #SBATCH --time=3-00:00:00
 #SBATCH --partition=scavenger
 #SBATCH --qos=scavenger
@@ -15,8 +15,8 @@
 #--SBATCH --dependency=afterany:
 
 # Usage:
-#   sbatch scripts/autoresume_train_city_psp.sh config/paper/cityscapes/cityscapes_pspnet50.yaml train_psp  None
-#                                                  [                   $1                   ]    [   $2   ] [$3]
+#   sbatch scripts/autoresume_train_city_psp.sh config/paper/cityscapes/cityscapes_pspnet50.yaml train_psp 
+#                                                  [                   $1                   ]    [   $2   ]
 
 # Setup environment
 export SCRIPT_DIR="/cfarhomes/psando/Documents/Robust-Semantic-Segmentation"
@@ -43,4 +43,4 @@ cd $SCRIPT_DIR
 
 # Train and validate
 export PYTHONPATH=${PYTHONPATH}:${SCRIPT_DIR}
-python ${EXPERIMENT_DIR}/${EXPERIMENT_NAME}.py --config=${EXPERIMENT_DIR}/$(basename $1) experiment_name ${EXPERIMENT_NAME} auto_resume True resume $3
+python ${EXPERIMENT_DIR}/${EXPERIMENT_NAME}.py --config=${EXPERIMENT_DIR}/$(basename $1) experiment_name ${EXPERIMENT_NAME} auto_resume True

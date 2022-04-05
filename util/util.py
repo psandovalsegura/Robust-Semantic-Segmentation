@@ -4,7 +4,6 @@ from PIL import Image
 
 import torch
 from torch import nn
-from lib.sync_bn.modules import BatchNorm1d, BatchNorm2d, BatchNorm3d
 import torch.nn.init as initer
 import matplotlib.pyplot as plt
 import torchvision.transforms.functional as F
@@ -109,8 +108,7 @@ def init_weights(model, conv='kaiming', batchnorm='normal', linear='kaiming', ls
             if m.bias is not None:
                 initer.constant_(m.bias, 0)
 
-        elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d,
-                            BatchNorm1d, BatchNorm2d, BatchNorm3d)):
+        elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
             if batchnorm == 'normal':
                 initer.normal_(m.weight, 1.0, 0.02)
             elif batchnorm == 'constant':
