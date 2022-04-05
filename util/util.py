@@ -87,6 +87,9 @@ def check_makedirs(dir_name):
         os.makedirs(dir_name)
 
 
+def get_latest_checkpoint_name(dir_name):
+    return sorted(os.listdir(dir_name))[-1]
+
 def init_weights(model, conv='kaiming', batchnorm='normal', linear='kaiming', lstm='kaiming'):
     """
     :param model: Pytorch Model which is nn.Module

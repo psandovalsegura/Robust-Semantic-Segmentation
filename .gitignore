@@ -60,4 +60,4 @@ lib/*
 zslurm/*
 *.out
 save_advs.py
-scripts/*
+scripts/old/*

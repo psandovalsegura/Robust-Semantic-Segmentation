@@ -35,6 +35,7 @@ TRAIN:
   save_freq: 1
   weight:  # path to initial weight (default: none)
   resume: ''
+  auto_resume: False 
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
 Distributed:
   dist_url: tcp://127.0.0.1:6789

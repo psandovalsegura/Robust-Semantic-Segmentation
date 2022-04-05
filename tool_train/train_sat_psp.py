@@ -21,7 +21,7 @@ from tensorboardX import SummaryWriter
 
 from model.pspnet import PSPNet, DeepLabV3
 from util import dataset, transform, config
-from util.util import AverageMeter, poly_learning_rate, intersectionAndUnionGPU, check_makedirs
+from util.util import AverageMeter, poly_learning_rate, intersectionAndUnionGPU, check_makedirs, get_latest_checkpoint_name
 
 cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
@@ -155,8 +155,11 @@ def main_worker(gpu, ngpus_per_node, argss):
             if main_process():
                 logger.info("=> no weight found at '{}'".format(args.weight))
 
-    if args.resume:
+    if args.resume or args.auto_resume:
         ckpt_path = os.path.join(args.model_save_path, args.resume)
+        if args.auto_resume:
+            latest_ckpt_name = get_latest_checkpoint_name(args.model_save_path)
+            ckpt_path = os.path.join(args.model_save_path, latest_ckpt_name)
         if os.path.isfile(ckpt_path):
             if main_process():
                 logger.info("=> loading checkpoint '{}'".format(ckpt_path))
