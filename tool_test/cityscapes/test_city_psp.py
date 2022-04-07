@@ -301,6 +301,19 @@ def test(test_loader, data_list, model, classes, mean, std, base_size, crop_h, c
         color.save(color_path)
     logger.info('<<<<<<<<<<<<<<<<< End Evaluation <<<<<<<<<<<<<<<<<')
 
+def encode_cityscapes_target(mask):
+    # Also referenced in util/dataset.py as _encode_segmap
+    void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
+    valid_classes = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
+    class_map = dict(zip(valid_classes, range(19)))
+    ignore_index = 255
+
+    # Set all void classes to 255
+    for _voidc in void_classes:
+        mask[mask == _voidc] = ignore_index
+    for _validc in valid_classes:
+        mask[mask == _validc] = class_map[_validc]
+    return mask
 
 def cal_acc(data_list, pred_folder, classes, names):
     intersection_meter = AverageMeter()
@@ -311,6 +324,7 @@ def cal_acc(data_list, pred_folder, classes, names):
         image_name = image_path.split('/')[-1].split('.')[0]
         pred = cv2.imread(os.path.join(pred_folder, image_name+'.png'), cv2.IMREAD_GRAYSCALE)
         target = cv2.imread(target_path, cv2.IMREAD_GRAYSCALE)
+        target = encode_cityscapes_target(target)
         target = cv2.resize(target, (1024, 512), interpolation=cv2.INTER_NEAREST)
 
         intersection, union, target = intersectionAndUnion(pred, target, classes)
