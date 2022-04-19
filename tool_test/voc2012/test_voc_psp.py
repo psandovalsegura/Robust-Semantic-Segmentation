@@ -157,12 +157,12 @@ def main():
             cal_acc(test_data.data_list, gray_folder, args.classes, names)
 
     # Run adversarial evaluation
-    if not args.has_prediction:
-        for attack_steps in args.test_attack_steps: 
-            gray_folder = os.path.join(args.save_path, f'gray_adv_{attack_steps}')
-            color_folder = os.path.join(args.save_path, f'color_adv_{attack_steps}')
+    for attack_steps in args.test_attack_steps: 
+        gray_folder = os.path.join(args.save_path, f'gray_adv_{attack_steps}')
+        color_folder = os.path.join(args.save_path, f'color_adv_{attack_steps}')
+        if not args.has_prediction:
             test(test_loader, test_data.data_list, model, args.classes, mean, std, args.base_size, args.test_h, args.test_w, args.scales, gray_folder, color_folder, colors, attack_steps=attack_steps)
-            cal_acc(test_data.data_list, gray_folder, args.classes, names)
+        cal_acc(test_data.data_list, gray_folder, args.classes, names)
 
 
 def net_process(model, image, target, mean, std=None, attack_steps=0):

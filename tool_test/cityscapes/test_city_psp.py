@@ -13,7 +13,7 @@ import torch.utils.data
 import torch.nn as nn
 from tqdm import tqdm
 
-from model.pspnet import PSPNet, DeepLabV3
+from model.pspnet import PSPNet, DeepLabV3_DDCAT, PSPNet_DDCAT 
 from util import dataset, transform, config
 from util.util import AverageMeter, intersectionAndUnion, check_makedirs, colorize
 
@@ -139,7 +139,10 @@ def main():
     names = [line.rstrip('\n') for line in open(args.names_path)]
 
     if not args.has_prediction:
-        model = PSPNet(layers=args.layers, classes=args.classes, zoom_factor=args.zoom_factor, pretrained=False)
+        if 'ddc' in args.experiment_name:
+            model = PSPNet_DDCAT(layers=args.layers, classes=args.classes, zoom_factor=args.zoom_factor, pretrained=False)
+        else: 
+            model = PSPNet(layers=args.layers, classes=args.classes, zoom_factor=args.zoom_factor, pretrained=False)
         # logger.info(model)
         model = torch.nn.DataParallel(model).cuda()
         cudnn.benchmark = True
@@ -154,15 +157,15 @@ def main():
             test(test_loader, test_data.data_list, model, args.classes, mean, std, args.base_size, args.test_h, args.test_w, args.scales, gray_folder, color_folder, colors)
     if args.split != 'test':
         if not args.skip_clean:
-            cal_acc(test_data.data_list, gray_folder, args.classes, names)
+            cal_acc(test_data.data_list, gray_folder, args.classes, names, desc='clean')
 
     # Run adversarial evaluation
-    if not args.has_prediction:
-        for attack_steps in args.test_attack_steps: 
-            gray_folder = os.path.join(args.save_path, f'gray_adv_{attack_steps}')
-            color_folder = os.path.join(args.save_path, f'color_adv_{attack_steps}')
+    for attack_steps in args.test_attack_steps: 
+        gray_folder = os.path.join(args.save_path, f'gray_adv_{attack_steps}')
+        color_folder = os.path.join(args.save_path, f'color_adv_{attack_steps}')
+        if not args.has_prediction:
             test(test_loader, test_data.data_list, model, args.classes, mean, std, args.base_size, args.test_h, args.test_w, args.scales, gray_folder, color_folder, colors, attack_steps=attack_steps)
-            cal_acc(test_data.data_list, gray_folder, args.classes, names)
+        cal_acc(test_data.data_list, gray_folder, args.classes, names, desc=f'adv {attack_steps}-step')
 
 
 def net_process(model, image, target, mean, std=None, attack_steps=0):
@@ -315,7 +318,7 @@ def encode_cityscapes_target(mask):
         mask[mask == _validc] = class_map[_validc]
     return mask
 
-def cal_acc(data_list, pred_folder, classes, names):
+def cal_acc(data_list, pred_folder, classes, names, desc):
     intersection_meter = AverageMeter()
     union_meter = AverageMeter()
     target_meter = AverageMeter()
@@ -340,6 +343,7 @@ def cal_acc(data_list, pred_folder, classes, names):
     mAcc = np.mean(accuracy_class)
     allAcc = sum(intersection_meter.sum) / (sum(target_meter.sum) + 1e-10)
 
+    logger.info('Eval description: {0}'.format(desc))
     logger.info('Eval result: mIoU/mAcc/allAcc {:.4f}/{:.4f}/{:.4f}.'.format(mIoU, mAcc, allAcc))
     for i in range(classes):
         logger.info('Class_{} result: iou/accuracy {:.4f}/{:.4f}, name: {}.'.format(i, iou_class[i], accuracy_class[i], names[i]))
