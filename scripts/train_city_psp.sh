@@ -15,7 +15,7 @@
 #--SBATCH --dependency=afterany:
 
 # Usage:
-#   sbatch scripts/train.sh config/paper/voc2012/voc2012_pspnet50.yaml train_sat_psp None
+#   sbatch scripts/train.sh config/paper/cityscapes/cityscapes_pspnet50.yaml train_sat_psp None
 #                           [                   $1                   ] [     $2    ] [$3]
 
 # Setup environment

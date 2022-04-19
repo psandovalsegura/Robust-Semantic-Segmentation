@@ -1,4 +1,41 @@
-# Dynamic Divide-and-Conquer Adversarial Training for Robust Semantic Segmentation
+# Robust Semantic Segmentation using AdvProp (a fork of DDC-AT)
+
+We propose adapting and evaluating some of the simplest, task-agnostic adversarial training methods from classification to set stronger baselines for robust segmentation. In this work, we adversarially train a PSPNet using [AdvProp](https://arxiv.org/abs/1911.09665) and achieve a network that is more robust than the state-of-the-art robust segmentation method (DDC-AT) from ICCV 2021.
+
+### Main changes:
+- Implementation of `MixBatchNorm2d` in model/mixbn.py. This class is used as the normalization layer in pspnet.py.
+- A few lines of training logic in tool_train/train_adv_prop_psp.py. Within `train`, we call `model.apply(to_adv_status)` before crafting adversarial examples, and `model.apply(to_mix_status)` when training. During inference, `model.apply(to_clean_status)` is called.
+- Saving directory structure was changed to prevent having to specify model save path and save folder in config file. Instead, within the `MISC.experiments_directory` defined in config/paper/cityscapes/cityscapes_pspnet50.yaml, a directory is created based on the training script name (i.e. "train_advprop_psp"). Checkpoints are saved in train_advprop_psp/model/ directory. Model output during evaluation is saved in train_advprop_psp/result.
+
+### How to train an AdvProp PSPNet:
+On VOC 2012:
+```
+python train_advprop_psp.py --config=config/paper/voc2012/voc2012_pspnet50.yaml experiment_name train_advprop_psp
+```
+
+On Cityscapes:
+```
+python train_advprop_psp.py --config=config/paper/cityscapes/cityscapes_pspnet50.yaml experiment_name train_advprop_psp
+```
+
+or use the slurm scripts:
+```
+sbatch scripts/train_voc_psp.sh config/paper/voc2012/voc2012_pspnet50.yaml train_advprop_psp ''
+```
+```
+sbatch scripts/train.sh config/paper/cityscapes/cityscapes_pspnet50.yaml train_advprop_psp ''
+```
+
+### How to evaluate an AdvProp PSPNet:
+All models, including ones which were trained using AdvProp, can be evaluated with voc2012/test_voc_psp.py or cityscapes/test_city_psp.py.
+```
+sbatch scripts/test_voc_psp.sh config/paper/voc2012/voc2012_pspnet50.yaml train_advprop_psp
+```
+```
+sbatch scripts/test_city_psp.sh config/paper/cityscapes/cityscapes_pspnet50.yaml train_advprop_psp
+```
+
+Slurm scripts are provided in the scripts/ directory. 
 
 ### Extra guidance for installing apex
 Ensure these modules are present and that nvidia-smi shows a GPU is available:
@@ -8,7 +45,7 @@ cd /cfarhomes/psando/apex
 pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 ```
 
-This is a pytorch project for the paper **Dynamic Divide-and-Conquer Adversarial Training for Robust Semantic Segmentation** by Xiaogang Xu, Hengshuang Zhao and Jiaya Jia presented at **ICCV2021**.
+This repo is based on the pytorch project for the paper **Dynamic Divide-and-Conquer Adversarial Training for Robust Semantic Segmentation** by Xiaogang Xu, Hengshuang Zhao and Jiaya Jia presented at **ICCV2021**.
 
 [paper link](https://jiaya.me/publication/), [arxiv](https://arxiv.org/pdf/2003.06555)
 
